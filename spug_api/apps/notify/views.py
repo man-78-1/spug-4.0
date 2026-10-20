@@ -13,7 +13,9 @@ class NotifyView(View):
 
     def patch(self, request):
         form, error = JsonParser(
-            Argument('ids', type=list, help='参数错误')
+            # type=list 只管外层，元素原样进 id__in；非整数元素会在 Django 内部抛 TypeError，
+            # 再被 HandleExceptionMiddleware 兜成 200 且把内部报错透给前端，所以在解析阶段就拒掉
+            Argument('ids', type=list, filter=lambda x: all(str(i).isdigit() for i in x), help='参数错误')
         ).parse(request.body)
         if error is None:
             Notify.objects.filter(id__in=form.ids).update(unread=False)

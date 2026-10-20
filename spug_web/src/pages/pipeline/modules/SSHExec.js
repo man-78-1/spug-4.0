@@ -1,0 +1,63 @@
+/**
+ * Copyright (c) OpenSpug Organization. https://github.com/openspug/spug
+ * Copyright (c) <spug.dev@gmail.com>
+ * Released under the AGPL-3.0 License.
+ */
+import React, { useEffect } from 'react';
+import { Form, Input, Radio, message } from 'antd';
+import { ACEditor } from 'components';
+import { t } from 'libs';
+import HostSelector from 'pages/host/Selector';
+
+function SSHExec(props) {
+  const [form] = Form.useForm()
+
+  useEffect(() => {
+    props.setHandler(() => handleSave)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    form.resetFields()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.node])
+
+  function handleSave() {
+    const data = form.getFieldsValue()
+    if (!data.name) return message.error(t('请输入节点名称'))
+    if (!data.condition) return message.error(t('请选择节点的执行条件'))
+    if (!data.targets || data.targets.length === 0) return message.error(t('请选择执行主机'))
+    if (!data.command) return message.error(t('请输入执行内容'))
+    return data
+  }
+
+  return (
+    <Form layout="vertical" form={form} initialValues={props.node}>
+      <Form.Item required name="name" label={t('节点名称')}>
+        <Input placeholder={t('请输入节点名称')}/>
+      </Form.Item>
+      <Form.Item required name="condition" label={t('执行条件')} tooltip={t('当该节点为流程的起始节点时（无上游节点），该条件将会被忽略。')}>
+        <Radio.Group>
+          <Radio.Button value="success">{t('上游执行成功时')}</Radio.Button>
+          <Radio.Button value="error">{t('上游执行失败时')}</Radio.Button>
+          <Radio.Button value="always">{t('总是执行')}</Radio.Button>
+        </Radio.Group>
+      </Form.Item>
+      <Form.Item required name="targets" label={t('选择主机')}>
+        <HostSelector type="button"/>
+      </Form.Item>
+      <Form.Item required label={t('执行内容')} shouldUpdate={(p, c) => p.interpreter !== c.interpreter}>
+        {({getFieldValue}) => (
+          <Form.Item name="command" noStyle>
+            <ACEditor
+              mode={getFieldValue('interpreter')}
+              width="464px"
+              height="220px"/>
+          </Form.Item>
+        )}
+      </Form.Item>
+    </Form>
+  )
+}
+
+export default SSHExec

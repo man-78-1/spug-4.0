@@ -1,0 +1,7 @@
+/.idea/
+
+# 本机生成、含密钥或运行期数据，一律不入库
+/spug_api/spug/overrides.py
+/spug_api/logs/
+/spug_api/storage/
+/.qoder-credits/

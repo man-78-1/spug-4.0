@@ -1,0 +1,62 @@
+.container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border-radius: 4px;
+  margin: -24px -24px 0;
+}
+
+.header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  background: #ffffff;
+  height: 56px;
+  padding-left: 24px;
+  padding-right: 12px;
+
+  .title {
+    font-size: 14px;
+    font-weight: bold;
+  }
+
+  .back {
+    color: #999999;
+
+    &:hover {
+      color: #2563fc;
+    }
+  }
+
+  .edit {
+    margin-left: 12px;
+    cursor: pointer;
+    font-size: 14px;
+
+    &:hover {
+      color: #2563fc;
+    }
+  }
+}
+
+.body {
+  position: relative;
+
+  .nodes {
+    height: calc(100vh - 48px - 56px);
+    padding: 24px;
+    overflow: auto;
+  }
+}
+
+.triangle {
+  width: 0;
+  height: 0;
+  border: 100px solid transparent;
+  border-top-color: #999999;
+}
+
+.row {
+  display: flex;
+  flex-direction: row;
+}

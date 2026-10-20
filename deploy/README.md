@@ -72,6 +72,25 @@ tail -20 /data/spug/spug_api/logs/api.log
 工作台能加载、右上角通知图标不报错、主机管理里能打开一台主机的**在线终端**（这条链路
 走 nginx→daphne→redis→paramiko，最容易出问题）。
 
+## 日常启停（在本机 Git Bash 里）
+
+`spug-ctl.sh` 把本地开发栈和服务器上的 Spug 进程收在一个入口，不带参数就是看两边状态：
+
+```bash
+bash deploy/spug-ctl.sh                      # = status：本地 :8000/:3000 + 服务器五进程
+bash deploy/spug-ctl.sh up        # 两边都起
+bash deploy/spug-ctl.sh down      # 两边都停
+bash deploy/spug-ctl.sh local down           # 只停本地（内部调用 tools/dev-stop.sh）
+bash deploy/spug-ctl.sh server down          # 只停服务器五个进程，nginx/MariaDB/Redis 不动
+bash deploy/spug-ctl.sh server restart spug-api   # 上传新代码后重启单个进程
+bash deploy/spug-ctl.sh server logs api      # 末尾 40 行 + Traceback 计数
+bash deploy/spug-ctl.sh server check         # 从本机验公网：首页 200 / api 401 / ws 101
+SPUG_SERVER=1.2.3.4 bash deploy/spug-ctl.sh server status   # 换机器
+```
+
+它只启停进程，**不会关闭 ECS 实例**（那要去阿里云控制台，且实例是 EIP，停机不会改变 `8.138.44.106`）。
+`server check` 的三项就是"部署后验证"里那三条，随时可以单独跑。
+
 ## 常见问题
 
 **`updatedb` 报 `MariaDB 10.4 or later is required (found 10.3.28)`**

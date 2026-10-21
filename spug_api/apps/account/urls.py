@@ -12,5 +12,6 @@ urlpatterns = [
     path('user/', UserView.as_view()),
     path('role/', RoleView.as_view()),
     path('self/', SelfView.as_view()),
-    path('login/history/', HistoryView.as_view())
+    path('login/history/', HistoryView.as_view()),
+    path('ping/', ping)
 ]

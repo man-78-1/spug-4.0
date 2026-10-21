@@ -5,7 +5,7 @@ from django.core.cache import cache
 from django.conf import settings
 from django.http.response import HttpResponse
 from libs.mixins import AdminView, View
-from libs import JsonParser, Argument, human_datetime, json_response
+from libs import JsonParser, Argument, human_datetime, json_response, auth
 from libs.utils import get_request_real_ip, generate_random_str
 from libs.spug import send_login_wx_code
 from apps.account.models import User, Role, History
@@ -280,3 +280,8 @@ def logout(request):
     request.user.token_expired = 0
     request.user.save()
     return json_response()
+
+
+@auth('host.host.view')
+def ping(request):
+    return json_response({'username': request.user.username})

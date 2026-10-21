@@ -46,7 +46,10 @@ class Scheduler:
     @classmethod
     def parse_trigger(cls, trigger, trigger_args):
         if trigger == 'interval':
-            return IntervalTrigger(seconds=int(trigger_args), timezone=cls.timezone)
+            seconds = int(trigger_args)
+            if seconds <= 0:
+                raise ValueError('interval must be greater than 0')
+            return IntervalTrigger(seconds=seconds, timezone=cls.timezone)
         elif trigger == 'date':
             return DateTrigger(run_date=trigger_args, timezone=cls.timezone)
         elif trigger == 'cron':
@@ -82,13 +85,16 @@ class Scheduler:
         self._init_builtin_jobs()
         try:
             for task in Task.objects.filter(is_active=True).exclude(trigger='monitor'):
-                trigger = self.parse_trigger(task.trigger, task.trigger_args)
-                self.scheduler.add_job(
-                    self.dispatch,
-                    trigger,
-                    id=str(task.id),
-                    args=(task.id, task.interpreter, task.command, json.loads(task.targets)),
-                )
+                try:
+                    trigger = self.parse_trigger(task.trigger, task.trigger_args)
+                    self.scheduler.add_job(
+                        self.dispatch,
+                        trigger,
+                        id=str(task.id),
+                        args=(task.id, task.interpreter, task.command, json.loads(task.targets)),
+                    )
+                except Exception as e:
+                    logging.warning(f'Failed to load schedule task {task.id}: {e}')
             connections.close_all()
         except DatabaseError:
             pass
@@ -100,17 +106,22 @@ class Scheduler:
         logging.warning('Running scheduler')
         while True:
             _, data = rds_cli.brpop(settings.SCHEDULE_KEY)
-            task = AttrDict(json.loads(data))
-            if task.action in ('add', 'modify'):
-                trigger = self.parse_trigger(task.trigger, task.trigger_args)
-                self.scheduler.add_job(
-                    self.dispatch,
-                    trigger,
-                    id=str(task.id),
-                    args=(task.id, task.interpreter, task.command, task.targets),
-                    replace_existing=True
-                )
-            elif task.action == 'remove':
-                job = self.scheduler.get_job(str(task.id))
-                if job:
-                    job.remove()
+            try:
+                task = AttrDict(json.loads(data))
+                if task.action in ('add', 'modify'):
+                    if task.trigger == 'monitor':
+                        continue
+                    trigger = self.parse_trigger(task.trigger, task.trigger_args)
+                    self.scheduler.add_job(
+                        self.dispatch,
+                        trigger,
+                        id=str(task.id),
+                        args=(task.id, task.interpreter, task.command, task.targets),
+                        replace_existing=True
+                    )
+                elif task.action == 'remove':
+                    job = self.scheduler.get_job(str(task.id))
+                    if job:
+                        job.remove()
+            except Exception as e:
+                logging.warning(f'Failed to process schedule message: {e}')

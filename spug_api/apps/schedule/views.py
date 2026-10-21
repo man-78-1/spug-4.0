@@ -38,15 +38,16 @@ class Schedule(View):
         if error is None:
             form.targets = json.dumps(form.targets)
             form.rst_notify = json.dumps(form.rst_notify)
-            if form.trigger == 'cron':
-                args = json.loads(form.trigger_args)['rule'].split()
-                if len(args) != 5:
-                    return json_response(error='无效的执行规则，请更正后再试')
-                minute, hour, day, month, week = args
-                week = '0' if week == '7' else week
+            if form.trigger == 'monitor':
                 try:
-                    CronTrigger(minute=minute, hour=hour, day=day, month=month, day_of_week=week)
-                except ValueError:
+                    if not isinstance(json.loads(form.trigger_args), list):
+                        raise ValueError
+                except (TypeError, ValueError):
+                    return json_response(error='无效的执行规则，请更正后再试')
+            else:
+                try:
+                    Scheduler.parse_trigger(form.trigger, form.trigger_args)
+                except (KeyError, TypeError, ValueError):
                     return json_response(error='无效的执行规则，请更正后再试')
             if form.id:
                 Task.objects.filter(pk=form.id).update(

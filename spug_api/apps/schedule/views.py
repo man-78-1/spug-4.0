@@ -96,8 +96,9 @@ class Schedule(View):
             if task:
                 if task.is_active:
                     return json_response(error='该任务在运行中，请先停止任务再尝试删除')
+                task_id = task.id
                 task.delete()
-                History.objects.filter(task_id=task.id).delete()
+                History.objects.filter(task_id=task_id).delete()
         return json_response(error=error)
 
 
@@ -111,7 +112,13 @@ class HistoryView(View):
         h_id = request.GET.get('id')
         if h_id:
             h_id = task.latest_id if h_id == 'latest' else h_id
-            return json_response(self._fetch_detail(h_id))
+            try:
+                record = History.objects.filter(pk=int(h_id)).first()
+            except (TypeError, ValueError):
+                record = None
+            if not record:
+                return json_response(error='未找到指定执行记录')
+            return json_response(self._fetch_detail(record))
         histories = History.objects.filter(task_id=t_id)
         return json_response([x.to_list() for x in histories])
 
@@ -135,8 +142,7 @@ class HistoryView(View):
         )
         return json_response(history.id)
 
-    def _fetch_detail(self, h_id):
-        record = History.objects.filter(pk=h_id).first()
+    def _fetch_detail(self, record):
         outputs = json.loads(record.output)
         host_ids = (x for x in outputs.keys() if x != 'local')
         hosts_info = {str(x.id): x.name for x in Host.objects.filter(id__in=host_ids)}

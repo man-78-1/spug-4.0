@@ -27,11 +27,12 @@ class GroupView(View):
         form, error = JsonParser(
             Argument('id', type=int, required=False),
             Argument('name', help='请输入组名'),
-            Argument('contacts', type=list, help='请选择联系人'),
+            Argument('contacts', type=list, filter=lambda x: all(str(i).isdigit() for i in x), help='请选择联系人'),
             Argument('desc', required=False)
         ).parse(request.body)
         if error is None:
-            form.contacts = json.dumps(form.contacts)
+            # 统一按整数落库，避免同一列里数字与字符串两种形态并存
+            form.contacts = json.dumps(sorted({int(x) for x in form.contacts}))
             if form.id:
                 Group.objects.filter(pk=form.id).update(**form)
             else:
@@ -85,9 +86,14 @@ class ContactView(View):
             Argument('id', type=int, help='请指定操作对象')
         ).parse(request.GET)
         if error is None:
-            group = Group.objects.filter(contacts__contains=f'\"{form.id}\"').first()
-            if group:
-                return json_response(error=f'报警联系组【{group.name}】包含此联系人，请解除关联后再尝试删除该联系人')
+            # contacts 历史上有数字/字符串两种形态，按文本匹配会漏判，解析后再比
+            for group in Group.objects.filter(contacts__isnull=False):
+                try:
+                    ids = [int(x) for x in json.loads(group.contacts)]
+                except (TypeError, ValueError):
+                    continue
+                if form.id in ids:
+                    return json_response(error=f'报警联系组【{group.name}】包含此联系人，请解除关联后再尝试删除该联系人')
             Contact.objects.filter(pk=form.id).delete()
         return json_response(error=error)
 

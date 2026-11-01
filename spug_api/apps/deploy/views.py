@@ -15,7 +15,7 @@ from apps.host.models import Host
 from collections import defaultdict
 from threading import Thread
 from datetime import datetime
-import subprocess
+import shutil
 import json
 import os
 
@@ -354,19 +354,29 @@ def get_request_info(request):
 
 @auth('deploy.request.add')
 def do_upload(request):
-    repos_dir = settings.REPOS_DIR
-    file = request.FILES['file']
+    file = request.FILES.get('file')
     deploy_id = request.POST.get('deploy_id')
-    if file and deploy_id:
-        dir_name = os.path.join(repos_dir, deploy_id)
-        file_name = datetime.now().strftime("%Y%m%d%H%M%S")
-        command = f'mkdir -p {dir_name} && cd {dir_name} && ls | sort  -rn | tail -n +11 | xargs rm -rf'
-        code, outputs = subprocess.getstatusoutput(command)
-        if code != 0:
-            return json_response(error=outputs)
-        with open(os.path.join(dir_name, file_name), 'wb') as f:
-            for chunk in file.chunks():
-                f.write(chunk)
-        return json_response(file_name)
-    else:
+    if not file:
         return HttpResponseBadRequest()
+    # deploy_id 会拼进目录路径，原先直接进 shell 的 rm -rf 命令串，这里只接受纯十进制数字
+    if not (deploy_id or '').isdecimal():
+        return json_response(error='参数错误')
+    deploy_id = int(deploy_id)
+    if not Deploy.objects.filter(pk=deploy_id).exists():
+        return json_response(error='未找到该发布配置')
+
+    dir_name = os.path.join(settings.REPOS_DIR, str(deploy_id))
+    os.makedirs(dir_name, exist_ok=True)
+    # 与旧实现一致：按秒级时间戳倒序，只保留最近 10 个上传包
+    for item in sorted(os.listdir(dir_name), reverse=True)[10:]:
+        path = os.path.join(dir_name, item)
+        if os.path.isdir(path):
+            shutil.rmtree(path, ignore_errors=True)
+        else:
+            os.remove(path)
+
+    file_name = datetime.now().strftime("%Y%m%d%H%M%S")
+    with open(os.path.join(dir_name, file_name), 'wb') as f:
+        for chunk in file.chunks():
+            f.write(chunk)
+    return json_response(file_name)

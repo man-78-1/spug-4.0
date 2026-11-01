@@ -45,6 +45,7 @@ class HostView(View):
             Argument('pkey', required=False),
             Argument('keep_pkey', type=bool, default=False),
             Argument('desc', required=False),
+            Argument('idc', required=False),
             Argument('password', required=False),
         ).parse(request.body)
         if error is None:

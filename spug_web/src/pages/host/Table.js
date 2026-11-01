@@ -146,6 +146,7 @@ function ComTable() {
         title={t('主机名称')}
         render={info => <Action.Button onClick={() => store.showDetail(info)}>{info.name}</Action.Button>}
         sorter={(a, b) => a.name.localeCompare(b.name)}/>
+      <Table.Column title={t('机房')} dataIndex="idc"/>
       <Table.Column title={t('IP地址')} render={info => (
         <div>
           <IPAddress ip={info.public_ip_address} isPublic/>

@@ -121,6 +121,9 @@ export default observer(function () {
         <Form.Item required name="name" label={t('主机名称')}>
           <Input placeholder={t('请输入主机名称')}/>
         </Form.Item>
+        <Form.Item name="idc" label={t('机房')}>
+          <Input placeholder={t('请输入机房名称')}/>
+        </Form.Item>
         <Form.Item required label={t('连接地址')} style={{marginBottom: 0}}>
           <Form.Item name="username" className={styles.formAddress1} style={{width: 'calc(30%)'}}>
             <Input addonBefore="ssh" placeholder={t('用户名')}/>

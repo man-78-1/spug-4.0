@@ -16,6 +16,7 @@ class Host(models.Model, ModelMixin):
     username = models.CharField(max_length=50)
     pkey = models.TextField(null=True)
     desc = models.CharField(max_length=255, null=True)
+    idc = models.CharField(max_length=50, null=True)
     is_verified = models.BooleanField(default=False)
     created_at = models.CharField(max_length=20, default=human_datetime)
     created_by = models.ForeignKey(User, models.PROTECT, related_name='+')

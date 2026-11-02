@@ -16,6 +16,7 @@ import json
 
 
 DEFAULT_TIMEOUT = 3600
+RETRY_DELAY = 5
 
 
 def local_executor(command, timeout):
@@ -71,8 +72,18 @@ def dispatch_job(host_id, interpreter, command, timeout=0):
 
 
 def schedule_worker_handler(job):
-    history_id, host_id, interpreter, command, timeout = json.loads(job)
-    code, duration, out = dispatch_job(host_id, interpreter, command, timeout)
+    history_id, host_id, interpreter, command, timeout, retry = json.loads(job)
+    attempts = []
+    for i in range(retry + 1):
+        if i:
+            time.sleep(RETRY_DELAY)
+        code, duration, out = dispatch_job(host_id, interpreter, command, timeout)
+        if retry:
+            attempts.append(f'[attempt {i + 1}/{retry + 1}] code={code}, {duration}s: {out}')
+        if code == 0:
+            break
+    if retry and (len(attempts) > 1 or code != 0):
+        out = '\n'.join(attempts)
 
     close_old_connections()
     with transaction.atomic():

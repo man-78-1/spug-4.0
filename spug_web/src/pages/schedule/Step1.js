@@ -109,6 +109,10 @@ export default observer(function (props) {
                    extra={t('0 表示使用默认上限 3600 秒，超时后任务被强制结束并判定为失败。')}>
           <InputNumber min={0} max={3600} style={{width: 200}} placeholder={t('请输入')}/>
         </Form.Item>
+        <Form.Item name="retry" label={t('失败重试(次)')}
+                   extra={t('任务失败后最多重试的次数，每次重试间隔 5 秒，全部失败后才发送失败通知。')}>
+          <InputNumber min={0} max={3} style={{width: 200}} placeholder={t('请输入')}/>
+        </Form.Item>
         <Form.Item label={t('失败通知')} extra={(
           <span>
             {t('任务执行失败告警通知，')}

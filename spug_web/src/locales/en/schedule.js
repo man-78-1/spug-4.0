@@ -30,6 +30,9 @@ const dict = {
   '超时时间(秒)': 'Timeout (seconds)',
   '0 表示使用默认上限 3600 秒，超时后任务被强制结束并判定为失败。':
     '0 means the default 3600-second limit. A task that exceeds it is killed and counted as failed.',
+  '失败重试(次)': 'Retries',
+  '任务失败后最多重试的次数，每次重试间隔 5 秒，全部失败后才发送失败通知。':
+    'Maximum retries after a failure, 5 seconds apart. The failure notification is sent only after all attempts fail.',
   '编辑任务': 'Edit Task',
   '创建任务': 'Create Task',
   '设置触发器': 'Set Trigger',

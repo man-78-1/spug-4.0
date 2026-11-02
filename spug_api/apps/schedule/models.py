@@ -40,6 +40,7 @@ class Task(models.Model, ModelMixin):
     interpreter = models.CharField(max_length=20, default='sh')
     command = models.TextField()
     timeout = models.IntegerField(default=0)
+    retry = models.IntegerField(default=0)
     targets = models.TextField()
     trigger = models.CharField(max_length=20, choices=TRIGGERS)
     trigger_args = models.CharField(max_length=255)

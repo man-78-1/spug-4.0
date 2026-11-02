@@ -56,4 +56,4 @@ def handle_trigger_event(task_id, target):
             else:
                 targets.append(t)
         if targets:
-            Scheduler.dispatch(item.id, item.interpreter, item.command, targets, item.timeout)
+            Scheduler.dispatch(item.id, item.interpreter, item.command, targets, item.timeout, item.retry)

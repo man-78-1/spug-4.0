@@ -32,6 +32,7 @@ MESSAGES = {
     '数据源路径必须为该主机上已存在的目录': 'The data source path must be an existing directory on the host',
     '无效的执行规则，请更正后再试': 'Invalid execution rule, please correct it and try again',
     '超时时间需为 0 至 3600 秒': 'Timeout must be between 0 and 3600 seconds',
+    '重试次数需为 0 至 3 次': 'Retry count must be between 0 and 3',
     '无权访问主机，请联系管理员': 'No permission to access this host, please contact the administrator',
     '无法删除当前登录账户': 'Cannot delete the currently signed-in account',
     '是否是超级用户（默认否）': 'Whether to create a superuser (default no)',

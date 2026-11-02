@@ -31,6 +31,8 @@ class Schedule(View):
             Argument('command', help='请输入任务内容'),
             Argument('timeout', type=int, required=False, default=0, filter=lambda x: 0 <= x <= 3600,
                      help='超时时间需为 0 至 3600 秒'),
+            Argument('retry', type=int, required=False, default=0, filter=lambda x: 0 <= x <= 3,
+                     help='重试次数需为 0 至 3 次'),
             Argument('rst_notify', type=dict, help='请选择执行失败通知方式'),
             Argument('targets', type=list, filter=lambda x: len(x), help='请选择执行对象'),
             Argument('trigger', filter=lambda x: x in dict(Task.TRIGGERS), help='请选择触发器类型'),
@@ -81,7 +83,7 @@ class Schedule(View):
                 if form.is_active:
                     message = {'id': form.id, 'action': 'add'}
                     message.update(task.to_dict(
-                        selects=('interpreter', 'trigger', 'trigger_args', 'command', 'targets', 'timeout')))
+                        selects=('interpreter', 'trigger', 'trigger_args', 'command', 'targets', 'timeout', 'retry')))
                 else:
                     message = {'id': form.id, 'action': 'remove'}
                 rds_cli = get_redis_connection()

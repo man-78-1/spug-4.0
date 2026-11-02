@@ -122,10 +122,11 @@ class ComTable extends React.Component {
   };
 
   handleTest = (text) => {
+    const limit = text.timeout > 0 ? text.timeout : 3600;
     Modal.confirm({
       title: t('操作确认'),
-      content: t('立即以串行模式执行该任务（不影响调度规则，且不会触发失败通知，测试执行会有120秒的超时，真实调度执行无此限制）？'),
-      onOk: () => http.post(`/api/schedule/${text.id}/`, null, {timeout: 120000})
+      content: t('立即以串行模式执行该任务（不影响调度规则，且不会触发失败通知，最长等待 {} 秒）？', limit),
+      onOk: () => http.post(`/api/schedule/${text.id}/`, null, {timeout: limit * 1000 + 5000})
         .then(res => store.showInfo(text, res))
     })
   };

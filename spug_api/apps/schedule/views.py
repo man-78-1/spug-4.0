@@ -29,6 +29,8 @@ class Schedule(View):
             Argument('name', help='请输入任务名称'),
             Argument('interpreter', help='请选择执行解释器'),
             Argument('command', help='请输入任务内容'),
+            Argument('timeout', type=int, required=False, default=0, filter=lambda x: 0 <= x <= 3600,
+                     help='超时时间需为 0 至 3600 秒'),
             Argument('rst_notify', type=dict, help='请选择执行失败通知方式'),
             Argument('targets', type=list, filter=lambda x: len(x), help='请选择执行对象'),
             Argument('trigger', filter=lambda x: x in dict(Task.TRIGGERS), help='请选择触发器类型'),
@@ -78,7 +80,8 @@ class Schedule(View):
                 task.latest_id = None
                 if form.is_active:
                     message = {'id': form.id, 'action': 'add'}
-                    message.update(task.to_dict(selects=('interpreter', 'trigger', 'trigger_args', 'command', 'targets')))
+                    message.update(task.to_dict(
+                        selects=('interpreter', 'trigger', 'trigger_args', 'command', 'targets', 'timeout')))
                 else:
                     message = {'id': form.id, 'action': 'remove'}
                 rds_cli = get_redis_connection()
@@ -129,7 +132,7 @@ class HistoryView(View):
             return json_response(error='未找到指定任务')
         outputs, status = {}, 1
         for host_id in json.loads(task.targets):
-            code, duration, out = dispatch_job(host_id, task.interpreter, task.command)
+            code, duration, out = dispatch_job(host_id, task.interpreter, task.command, task.timeout)
             if code != 0:
                 status = 2
             outputs[host_id] = [code, duration, out]

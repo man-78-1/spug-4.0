@@ -22,11 +22,14 @@ const dict = {
   '历史记录': 'History',
   '确定要禁用任务【{}】?': 'Are you sure you want to disable task [{}]?',
   '确定要激活任务【{}】?': 'Are you sure you want to activate task [{}]?',
-  '立即以串行模式执行该任务（不影响调度规则，且不会触发失败通知，测试执行会有120秒的超时，真实调度执行无此限制）？':
-    'Run this task now in serial mode? It does not affect the schedule and no failure notification will be sent. Test runs have a 120-second timeout, which does not apply to real scheduled runs.',
+  '立即以串行模式执行该任务（不影响调度规则，且不会触发失败通知，最长等待 {} 秒）？':
+    'Run this task now in serial mode? It does not affect the schedule and no failure notification will be sent. It waits for up to {} seconds.',
 
   // Form wizard
   '新建任务': 'New Task',
+  '超时时间(秒)': 'Timeout (seconds)',
+  '0 表示使用默认上限 3600 秒，超时后任务被强制结束并判定为失败。':
+    '0 means the default 3600-second limit. A task that exceeds it is killed and counted as failed.',
   '编辑任务': 'Edit Task',
   '创建任务': 'Create Task',
   '设置触发器': 'Set Trigger',

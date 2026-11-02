@@ -5,7 +5,7 @@
  */
 import React, { useState } from 'react';
 import { observer } from 'mobx-react';
-import { Form, Input, Select, Modal, Button, Radio } from 'antd';
+import { Form, Input, Select, Modal, Button, Radio, InputNumber } from 'antd';
 import { ExclamationCircleOutlined } from '@ant-design/icons';
 import { LinkButton, ACEditor, Container } from 'components';
 import TemplateSelector from '../exec/task/TemplateSelector';
@@ -104,6 +104,10 @@ export default observer(function (props) {
                         onChange={setCommand}/>
             )}
           </Form.Item>
+        </Form.Item>
+        <Form.Item name="timeout" label={t('超时时间(秒)')}
+                   extra={t('0 表示使用默认上限 3600 秒，超时后任务被强制结束并判定为失败。')}>
+          <InputNumber min={0} max={3600} style={{width: 200}} placeholder={t('请输入')}/>
         </Form.Item>
         <Form.Item label={t('失败通知')} extra={(
           <span>

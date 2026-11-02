@@ -62,7 +62,7 @@ class Scheduler:
             raise TypeError(f'unknown schedule policy: {trigger!r}')
 
     @classmethod
-    def dispatch(cls, task_id, interpreter, command, targets):
+    def dispatch(cls, task_id, interpreter, command, targets, timeout=0):
         output = {x: None for x in targets}
         history = History.objects.create(
             task_id=task_id,
@@ -73,7 +73,7 @@ class Scheduler:
         Task.objects.filter(pk=task_id).update(latest_id=history.id)
         rds_cli = get_redis_connection()
         for t in targets:
-            rds_cli.rpush(SCHEDULE_WORKER_KEY, json.dumps([history.id, t, interpreter, command]))
+            rds_cli.rpush(SCHEDULE_WORKER_KEY, json.dumps([history.id, t, interpreter, command, timeout]))
         connections.close_all()
 
     def _init_builtin_jobs(self):
@@ -91,7 +91,7 @@ class Scheduler:
                         self.dispatch,
                         trigger,
                         id=str(task.id),
-                        args=(task.id, task.interpreter, task.command, json.loads(task.targets)),
+                        args=(task.id, task.interpreter, task.command, json.loads(task.targets), task.timeout),
                     )
                 except Exception as e:
                     logging.warning(f'Failed to load schedule task {task.id}: {e}')
@@ -116,7 +116,7 @@ class Scheduler:
                         self.dispatch,
                         trigger,
                         id=str(task.id),
-                        args=(task.id, task.interpreter, task.command, task.targets),
+                        args=(task.id, task.interpreter, task.command, task.targets, task.timeout),
                         replace_existing=True
                     )
                 elif task.action == 'remove':

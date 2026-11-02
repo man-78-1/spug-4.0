@@ -9,6 +9,7 @@ from paramiko.dsskey import DSSKey
 from paramiko.ssh_exception import AuthenticationException, SSHException, PasswordRequiredException  # noqa (re-exported)
 from io import StringIO
 from uuid import uuid4
+import socket
 import time
 import re
 
@@ -102,7 +103,7 @@ class SSH:
         command = KILLER % pid
         self.exec_command_raw(command)
 
-    def exec_command_raw(self, command, environment=None):
+    def exec_command_raw(self, command, environment=None, timeout=None):
         self.get_client()
         channel = self.client.get_transport().open_session()
         channel.set_combine_stderr(True)
@@ -111,12 +112,18 @@ class SSH:
             # sshd 默认 AcceptEnv 只放行 LANG/LC_*，其他变量会被服务端静默丢弃
             command = self._make_env_command(environment) + command
         channel.exec_command(command)
+        if timeout:
+            channel.settimeout(timeout)
         output = b''
-        while True:
-            data = channel.recv(4096)
-            if not data:
-                break
-            output += data
+        try:
+            while True:
+                data = channel.recv(4096)
+                if not data:
+                    break
+                output += data
+        except socket.timeout:
+            channel.close()
+            return 1, f'timeout after {timeout} seconds'
         return channel.recv_exit_status(), self._decode(output)
 
     def exec_command(self, command, environment=None):

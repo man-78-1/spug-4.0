@@ -9,28 +9,45 @@ from apps.schedule.utils import send_fail_notify
 from libs.utils import wrap_python_command
 import subprocess
 import socket
+import signal
+import os
 import time
 import json
 
 
-def local_executor(command):
+DEFAULT_TIMEOUT = 3600
+
+
+def local_executor(command, timeout):
     code, out, now = 1, None, time.time()
-    task = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if os.name == 'nt':
+        extra = {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP}
+    else:
+        extra = {'start_new_session': True}
+    task = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **extra)
     try:
-        code = task.wait(3600)
-        out = task.stdout.read() + task.stderr.read()
-        out = out.decode()
+        stdout, stderr = task.communicate(timeout=timeout)
+        code = task.returncode
+        out = (stdout + stderr).decode()
     except subprocess.TimeoutExpired:
-        # task.kill()
-        out = 'timeout, wait more than 1 hour'
+        if os.name == 'nt':
+            subprocess.run(['taskkill', '/F', '/T', '/PID', str(task.pid)], capture_output=True)
+        else:
+            try:
+                os.killpg(task.pid, signal.SIGKILL)
+            except OSError:
+                pass
+        task.communicate()
+        code = 1
+        out = f'timeout after {timeout} seconds'
     return code, round(time.time() - now, 3), out
 
 
-def host_executor(host, command):
+def host_executor(host, command, timeout):
     code, out, now = 1, None, time.time()
     try:
         with host.get_ssh() as ssh:
-            code, out = ssh.exec_command_raw(command)
+            code, out = ssh.exec_command_raw(command, timeout=timeout)
     except AuthenticationException:
         out = 'ssh authentication fail'
     except socket.error as e:
@@ -38,23 +55,24 @@ def host_executor(host, command):
     return code, round(time.time() - now, 3), out
 
 
-def dispatch_job(host_id, interpreter, command):
+def dispatch_job(host_id, interpreter, command, timeout=0):
+    timeout = timeout if timeout > 0 else DEFAULT_TIMEOUT
     if interpreter == 'python':
         command = wrap_python_command(command)
     if host_id == 'local':
-        code, duration, out = local_executor(command)
+        code, duration, out = local_executor(command, timeout)
     else:
         host = Host.objects.filter(pk=host_id).first()
         if not host:
             code, duration, out = 1, 0, f'unknown host id for {host_id!r}'
         else:
-            code, duration, out = host_executor(host, command)
+            code, duration, out = host_executor(host, command, timeout)
     return code, duration, out
 
 
 def schedule_worker_handler(job):
-    history_id, host_id, interpreter, command = json.loads(job)
-    code, duration, out = dispatch_job(host_id, interpreter, command)
+    history_id, host_id, interpreter, command, timeout = json.loads(job)
+    code, duration, out = dispatch_job(host_id, interpreter, command, timeout)
 
     close_old_connections()
     with transaction.atomic():

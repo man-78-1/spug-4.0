@@ -9,7 +9,7 @@ from libs import json_response, JsonParser, Argument, human_datetime, auth, Attr
 from apps.deploy.models import DeployRequest
 from apps.app.models import Deploy, DeployExtend2
 from apps.repository.models import Repository
-from apps.deploy.utils import dispatch, Helper
+from apps.deploy.utils import dispatch, Helper, sync_interrupted
 from libs.locale import get_request_language
 from apps.host.models import Host
 from collections import defaultdict
@@ -28,7 +28,7 @@ class RequestView(View):
             perms = request.user.deploy_perms
             query['deploy__app_id__in'] = perms['apps']
             query['deploy__env_id__in'] = perms['envs']
-        for item in DeployRequest.objects.filter(**query).annotate(
+        requests = list(DeployRequest.objects.filter(**query).annotate(
                 env_id=F('deploy__env_id'),
                 env_name=F('deploy__env__name'),
                 app_id=F('deploy__app_id'),
@@ -38,7 +38,9 @@ class RequestView(View):
                 rep_extra=F('repository__extra'),
                 do_by_user=F('do_by__nickname'),
                 approve_by_user=F('approve_by__nickname'),
-                created_by_user=F('created_by__nickname')):
+                created_by_user=F('created_by__nickname')))
+        sync_interrupted(requests)
+        for item in requests:
             tmp = item.to_dict()
             tmp['env_id'] = item.env_id
             tmp['env_name'] = item.env_name
@@ -102,6 +104,7 @@ class RequestDetailView(View):
         req = DeployRequest.objects.filter(pk=r_id).first()
         if not req:
             return json_response(error='未找到指定发布申请')
+        sync_interrupted([req])
         response = AttrDict(status=req.status)
         hosts = Host.objects.filter(id__in=json.loads(req.host_ids))
         outputs = {x.id: {'id': x.id, 'title': x.name, 'data': ''} for x in hosts}
@@ -345,6 +348,7 @@ def get_request_info(request):
     ).parse(request.GET)
     if error is None:
         req = DeployRequest.objects.get(pk=form.id)
+        sync_interrupted([req])
         response = req.to_dict(selects=('status', 'reason'))
         response['deploy_status'] = json.loads(req.deploy_status)
         response['status_alias'] = req.get_status_display()

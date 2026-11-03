@@ -30,6 +30,8 @@ MESSAGES = {
     '报警方式 微信、短信、邮件需要配置调用凭据（系统设置/基本设置），请配置后再启用该报警方式。': 'WeChat, SMS and email alerts require an API credential (System Settings / Basic Settings), please configure it before enabling this alert method.',
     '报警联系组【{group.name}】包含此联系人，请解除关联后再尝试删除该联系人': 'The alert contact group "{group.name}" contains this contact, please remove it from the group before deleting the contact',
     '数据源路径必须为该主机上已存在的目录': 'The data source path must be an existing directory on the host',
+    '分发任务不存在或已失效': 'The transfer task does not exist or has expired',
+    '该分发任务已执行，请勿重复提交': 'This transfer task has already been dispatched, please do not submit it again',
     '无效的执行规则，请更正后再试': 'Invalid execution rule, please correct it and try again',
     '超时时间需为 0 至 3600 秒': 'Timeout must be between 0 and 3600 seconds',
     '重试次数需为 0 至 3 次': 'Retry count must be between 0 and 3',

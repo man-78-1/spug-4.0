@@ -102,7 +102,13 @@ class TransferView(View):
             Argument('token', help='参数错误')
         ).parse(request.body)
         if error is None:
-            task = Transfer.objects.get(digest=form.token)
+            task = Transfer.objects.filter(digest=form.token, user=request.user).first()
+            if not task:
+                return json_response(error='分发任务不存在或已失效')
+            rds = get_redis_connection()
+            # 分发结束会清理源目录，同一 token 再触发只会多起一轮必然失败的 rsync
+            if not rds.set(f'spug:transfer:dispatch:{task.digest}', 1, nx=True, ex=7 * 86400):
+                return json_response(error='该分发任务已执行，请勿重复提交')
             Thread(target=_dispatch_sync, args=(task, get_request_language(request))).start()
         return json_response(error=error)
 

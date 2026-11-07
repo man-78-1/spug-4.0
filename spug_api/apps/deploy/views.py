@@ -148,7 +148,12 @@ class RequestDetailView(View):
                     return json_response(error='请选择灰度发布的主机')
                 host_ids = form.host_ids
             elif form.mode == 'fail':
-                host_ids = [int(k) for k, v in deploy_status.items() if v != '2' and k != 'local']
+                # 补偿要覆盖所有还没成功的主机：灰度后没参与发布的主机在 deploy_status 里没有键，
+                # 只按已有的键筛就会漏掉它们，而空集合还会把申请单直接写成发布异常
+                done = {int(k) for k, v in deploy_status.items() if k != 'local' and v == '2'}
+                host_ids = [x for x in json.loads(req.host_ids) if x not in done]
+                if not host_ids:
+                    return json_response(error='目标主机都已发布成功，无需补偿发布')
             else:
                 host_ids = json.loads(req.host_ids)
 

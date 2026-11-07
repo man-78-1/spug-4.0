@@ -64,6 +64,7 @@ MESSAGES = {
     '监控中心的任务【{detection.name}】关联了该主机，请解除关联后再尝试删除该主机': 'The monitor task "{detection.name}" references this host, please remove the association before deleting the host',
     '监控任务【{detection.name}】正在使用该报警组，请解除关联后再尝试删除该联系组': 'The monitor task "{detection.name}" is using this alert group, please remove the association before deleting the contact group',
     '目前暂不支持短信告警，请关注后续更新。': 'SMS alerts are not supported yet, stay tuned for future updates.',
+    '目标主机都已发布成功，无需补偿发布': 'All target hosts are already deployed successfully, no need to deploy the remaining hosts',
     '缺少必要参数': 'Missing required parameters',
     '缺少必要的参数': 'Missing required parameters',
     '解析配置{line!r}失败，确认其遵循 key = value 格式': 'Failed to parse configuration {line!r}, make sure it follows the key = value format',

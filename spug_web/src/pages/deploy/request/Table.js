@@ -13,7 +13,6 @@ import HostSelector from './HostSelector';
 import S from './index.module.less';
 import store from './store';
 import moment from 'moment';
-import lds from 'lodash';
 
 function ComTable() {
   const [request, setRequest] = useState()
@@ -178,15 +177,16 @@ function ComTable() {
   }];
 
   function DoAction(props) {
-    const {deploy_status} = props.info;
+    const {deploy_status, host_ids} = props.info;
+    const pending = (host_ids || []).filter(x => deploy_status[x] !== '2');
     return (
       <Popover trigger="click" zIndex={2} title={t('确认发布方式')} content={(
         <div>
           <div style={{color: '#999', fontSize: 12}}>{t('全量：发布所有主机（包含已成功的）。')}</div>
-          <div style={{color: '#999', fontSize: 12}}>{t('补偿：仅发布上次发布失败的主机。')}</div>
+          <div style={{color: '#999', fontSize: 12}}>{t('补偿：发布还没成功的主机，包括灰度后未发布的主机。')}</div>
           <div style={{color: '#999', fontSize: 12}}>{t('灰度：选择指定主机发布。')}</div>
           <Space style={{width: '100%', justifyContent: 'flex-end', marginTop: 16}}>
-            <Button size="small" disabled={!lds.findKey(deploy_status, x => x !== '2')}
+            <Button size="small" disabled={pending.length === 0}
                     onClick={() => handleDeploy(props.info, 'fail')}>{t('补偿')}</Button>
             <Button ghost size="small" type="primary" onClick={() => setRequest(props.info)}>{t('灰度')}</Button>
             <Button size="small" type="primary" onClick={() => handleDeploy(props.info, 'all')}>{t('全量')}</Button>

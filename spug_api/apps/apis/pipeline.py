@@ -5,7 +5,7 @@ from django.conf import settings
 from django_redis import get_redis_connection
 from apps.apis.utils import api_key_required, api_response, parse_json_body
 from apps.pipeline.models import Pipeline, PipeHistory
-from apps.pipeline.utils import NodeExecutor, fill_node_targets
+from apps.pipeline.utils import NodeExecutor, fill_node_targets, validate_nodes
 from libs.validators import is_env_name
 from threading import Thread
 from uuid import uuid4
@@ -32,6 +32,8 @@ def trigger(request, pipeline_id):
     nodes = json.loads(pipe.nodes)
     if not nodes:
         return api_response(error='Pipeline has no nodes', status=400)
+    if validate_nodes(nodes):
+        return api_response(error='Invalid pipeline node graph', status=400)
 
     params = body.get('params') or {}
     if not isinstance(params, dict):

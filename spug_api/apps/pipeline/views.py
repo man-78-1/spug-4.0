@@ -11,7 +11,7 @@ from libs.locale import get_request_language
 from libs.gitlib import RemoteGit
 from apps.pipeline.helper import Helper
 from apps.pipeline.models import Pipeline, PipeHistory
-from apps.pipeline.utils import NodeExecutor, fill_node_targets
+from apps.pipeline.utils import NodeExecutor, fill_node_targets, validate_nodes
 from apps.credential.models import Credential
 from threading import Thread
 from pathlib import Path
@@ -48,6 +48,8 @@ class PipeView(View):
             Argument('nodes', type=list, handler=json.dumps, default='[]')
         ).parse(request.body)
         if error is None:
+            error = validate_nodes(json.loads(form.nodes))
+        if error is None:
             if form.id:
                 Pipeline.objects.filter(pk=form.id).update(**form)
                 pipe = Pipeline.objects.get(pk=form.id)
@@ -63,6 +65,8 @@ class PipeView(View):
             Argument('name', required=False),
             Argument('nodes', type=list, handler=json.dumps, required=False),
         ).parse(request.body, True)
+        if error is None and 'nodes' in form:
+            error = validate_nodes(json.loads(form.nodes))
         if error is None:
             Pipeline.objects.filter(pk=form.id).update(**form)
         return json_response(error=error)
@@ -88,7 +92,11 @@ class DoView(View):
         ).parse(request.body)
         if error is None:
             pipe = Pipeline.objects.get(pk=form.id)
-            nodes = fill_node_targets(json.loads(pipe.nodes))
+            nodes = json.loads(pipe.nodes)
+            error = validate_nodes(nodes)
+            if error:
+                return json_response(error=error)
+            nodes = fill_node_targets(nodes)
 
             dynamic_params = []
             for item in nodes:
@@ -149,6 +157,9 @@ class DoView(View):
                     form.params[k] = ','.join(str(x) for x in v)
             pipe = Pipeline.objects.get(pk=form.id)
             nodes = json.loads(pipe.nodes)
+            error = validate_nodes(nodes)
+            if error:
+                return json_response(error=error)
             for item in nodes:
                 if item.get('module') == 'parameter':
                     item['dynamic_params'] = form.params

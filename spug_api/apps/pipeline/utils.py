@@ -42,6 +42,54 @@ DEFAULT_PUSH_BODY = (
 )
 
 
+def validate_nodes(nodes):
+    """保存和执行前校验节点图，返回错误文案或 None。
+
+    执行器按 downstream 递归展开，环会让节点被反复执行直到 RecursionError，
+    指向不存在节点的下游则直接抛 KeyError，所以在入口就把坏图挡掉。
+    """
+    if not isinstance(nodes, list):
+        return '节点数据格式错误'
+    ids = set()
+    for item in nodes:
+        if not isinstance(item, dict):
+            return '节点数据格式错误'
+        node_id = item.get('id')
+        if isinstance(node_id, bool) or not isinstance(node_id, (int, str)):
+            return '节点数据格式错误'
+        if node_id in ids:
+            return '节点 ID 重复'
+        ids.add(node_id)
+    graph = {}
+    for item in nodes:
+        downstream = item.get('downstream') or []
+        if not isinstance(downstream, list):
+            return '节点数据格式错误'
+        for node_id in downstream:
+            if node_id not in ids:
+                return '节点引用了不存在的下游节点'
+        if len(set(downstream)) != len(downstream):
+            return '节点存在重复的下游节点'
+        graph[item['id']] = downstream
+    # Kahn 拓扑排序：无法访问全部节点说明图中有环
+    indegree = dict.fromkeys(ids, 0)
+    for downstream in graph.values():
+        for node_id in downstream:
+            indegree[node_id] += 1
+    queue = [x for x, value in indegree.items() if value == 0]
+    visited = 0
+    while queue:
+        node_id = queue.pop()
+        visited += 1
+        for x in graph[node_id]:
+            indegree[x] -= 1
+            if indegree[x] == 0:
+                queue.append(x)
+    if visited != len(ids):
+        return '节点图存在循环依赖'
+    return None
+
+
 def fill_node_targets(nodes):
     """把节点里的主机 id 补成展示名，控制台的主机分页和历史回放都依赖 _targets"""
     ids = set()

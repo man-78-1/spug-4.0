@@ -18,6 +18,7 @@ from pathlib import Path
 from uuid import uuid4
 import copy
 import json
+import re
 
 
 class PipeView(View):
@@ -230,8 +231,15 @@ def handle_data_upload(request):
     file = request.FILES.get('file')
     if not all([token, node_id, file]):
         return HttpResponseBadRequest('参数错误')
+    # token 和节点 id 都是服务端生成、原样回传的，直接拼路径时不做限制就能借绝对路径
+    # 或 ../ 把文件写到 TRANSFER_DIR 之外；最终路径再校验一次必须落在 TRANSFER_DIR 内
+    if not re.fullmatch(r'[0-9a-f]{32}', token) or not re.fullmatch(r'[0-9A-Za-z_-]{1,64}', node_id):
+        return HttpResponseBadRequest('参数错误')
 
-    file_path = Path(settings.TRANSFER_DIR) / token / node_id / file.name
+    base_dir = Path(settings.TRANSFER_DIR).resolve()
+    file_path = (base_dir / token / node_id / file.name).resolve()
+    if base_dir not in file_path.parents:
+        return HttpResponseBadRequest('参数错误')
     file_path.parent.mkdir(parents=True, exist_ok=True)
     with open(file_path, 'wb') as f:
         for chunk in file.chunks():

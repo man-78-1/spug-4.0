@@ -9,7 +9,7 @@ from libs import json_response, JsonParser, Argument, human_datetime, auth, Attr
 from apps.deploy.models import DeployRequest
 from apps.app.models import Deploy, DeployExtend2
 from apps.repository.models import Repository
-from apps.deploy.utils import dispatch, Helper, sync_interrupted
+from apps.deploy.utils import dispatch, Helper, sync_interrupted, check_hosts
 from libs.locale import get_request_language
 from apps.host.models import Host
 from collections import defaultdict
@@ -146,6 +146,9 @@ class RequestDetailView(View):
             if form.mode == 'gray':
                 if not form.host_ids:
                     return json_response(error='请选择灰度发布的主机')
+                # 审核通过的是申请单里的主机，灰度只能在它们中间选，不能借接口扩大范围
+                if not check_hosts(form.host_ids, json.loads(req.host_ids)):
+                    return json_response(error='所选主机不在该申请的主机范围内')
                 host_ids = form.host_ids
             elif form.mode == 'fail':
                 # 补偿要覆盖所有还没成功的主机：灰度后没参与发布的主机在 deploy_status 里没有键，
@@ -235,6 +238,8 @@ def post_request_ext1(request):
     ).parse(request.body)
     if error is None:
         deploy = Deploy.objects.get(pk=form.deploy_id)
+        if not check_hosts(form.host_ids, json.loads(deploy.host_ids)):
+            return json_response(error='所选主机不在发布配置的主机范围内')
         form.spug_version = Repository.make_spug_version(deploy.id)
         # reset the link to a built artifact, an edit may switch back to git
         form.repository_id = None
@@ -282,6 +287,9 @@ def post_request_ext1_rollback(request):
     ).parse(request.body)
     if error is None:
         req = DeployRequest.objects.get(pk=form.pop('request_id'))
+        # 回滚沿用原申请的主机范围，前端也是这么限制的，这里补齐服务端校验
+        if not check_hosts(form.host_ids, json.loads(req.host_ids)):
+            return json_response(error='所选主机不在原发布申请的主机范围内')
         requests = DeployRequest.objects.filter(deploy=req.deploy, status__in=('3', '-3'))
         versions = list({x.spug_version: 1 for x in requests}.keys())
         if req.spug_version not in versions[:req.deploy.extend_obj.versions + 1]:
@@ -322,6 +330,8 @@ def post_request_ext2(request):
         deploy = Deploy.objects.filter(pk=form.deploy_id).first()
         if not deploy:
             return json_response(error='未找到该发布配置')
+        if not check_hosts(form.host_ids, json.loads(deploy.host_ids)):
+            return json_response(error='所选主机不在发布配置的主机范围内')
         extra = form.pop('extra')
         if DeployExtend2.objects.filter(deploy=deploy, host_actions__contains='"src_mode": "1"').exists():
             if not extra:

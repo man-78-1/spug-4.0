@@ -23,6 +23,26 @@ def alive_key(request_id):
     return f'{settings.REQUEST_KEY}:alive:{request_id}'
 
 
+def check_hosts(host_ids, allowed_host_ids):
+    """校验提交的主机全部落在允许范围内。
+
+    前端的主机选择器只是把可选项限制在范围内，直接调用接口仍可提交任意主机；
+    发布会在选中的主机上执行命令，所以服务端必须再校验一次。
+    """
+    if not isinstance(host_ids, list):
+        return False
+    try:
+        allowed = {int(x) for x in allowed_host_ids}
+    except (TypeError, ValueError):
+        return False
+    for host_id in host_ids:
+        if isinstance(host_id, bool) or not isinstance(host_id, int):
+            return False
+        if host_id not in allowed:
+            return False
+    return True
+
+
 def _keep_alive(rds, key, stop):
     while not stop.wait(ALIVE_INTERVAL):
         rds.setex(key, ALIVE_TTL, 1)

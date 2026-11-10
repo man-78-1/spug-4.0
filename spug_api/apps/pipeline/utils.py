@@ -14,7 +14,7 @@ from apps.pipeline.helper import Helper
 from apps.pipeline.models import PipeHistory
 from apps.setting.utils import AppSetting
 from functools import partial
-from threading import Thread, Lock
+from threading import Thread, Lock, Event
 from concurrent import futures
 from pathlib import Path
 from uuid import uuid4
@@ -112,6 +112,9 @@ def fill_node_targets(nodes):
 
 
 class NodeExecutor:
+    PID_TTL = 3600
+    PID_REFRESH = 300
+
     def __init__(self, rds, token, nodes, params=None, pipe_name=None, language='zh', history_id=None):
         self.rds = rds
         self.token = token
@@ -128,6 +131,23 @@ class NodeExecutor:
         self.states = {}
         self.pending = 0
         self.lock = Lock()
+
+    def _save_pid(self, key, value):
+        # 运行期间续期，避免超过 1 小时的任务在结束前丢失终止入口
+        self.rds.set(key, value, self.PID_TTL)
+        stop = Event()
+
+        def refresh():
+            while not stop.wait(self.PID_REFRESH):
+                self.rds.expire(key, self.PID_TTL)
+
+        Thread(target=refresh, daemon=True).start()
+        return stop
+
+    def _remove_pid(self, key, stop=None):
+        if stop:
+            stop.set()
+        self.rds.delete(key)
 
     def run(self, node=None, state=None):
         if node:
@@ -297,7 +317,7 @@ class NodeExecutor:
 
     def _do_build(self, node):
         timestamp = time.time()
-        is_success, pid_key = False, None
+        is_success, pid_key, pid_stop = False, None, None
         try:
             # resolve which ref to checkout, a None marker means the latest tag
             if node.get('git_mode') == 'tag':
@@ -327,7 +347,7 @@ class NodeExecutor:
                 pid_key = f'{self.token}.{node.id}.{host.id}'
                 pid = git.ssh.get_pid()
                 if pid:
-                    self.rds.set(pid_key, f'{host.id}.{pid}', 3600)
+                    pid_stop = self._save_pid(pid_key, f'{host.id}.{pid}')
                 git.set_remote_exec(partial(self.helper.remote_exec, node.id))
                 is_success = git.checkout(marker)
                 if is_success and node.get('command'):
@@ -343,7 +363,7 @@ class NodeExecutor:
             is_success = False
         finally:
             if pid_key:
-                self.rds.delete(pid_key)
+                self._remove_pid(pid_key, pid_stop)
         self.run(node, 'success' if is_success else 'error')
 
     def _do_ssh_exec(self, node):
@@ -362,18 +382,19 @@ class NodeExecutor:
         timestamp = time.time()
         key = f'{node.id}.{host.id}'
         pid_key = f'{self.token}.{node.id}.{host.id}'
+        pid_stop = None
         self.helper.send_info(key, '开始执行\r\n', 'processing')
         try:
             with host.get_ssh() as ssh:
                 pid = ssh.get_pid()
                 if pid:
-                    self.rds.set(pid_key, f'{host.id}.{pid}', 3600)
+                    pid_stop = self._save_pid(pid_key, f'{host.id}.{pid}')
                 is_success = self.helper.remote_exec(key, ssh, node.command, self.env)
         except Exception as e:
             self.helper.send_error(key, f'Exception: {e}')
             return False
         finally:
-            self.rds.delete(pid_key)
+            self._remove_pid(pid_key, pid_stop)
         if is_success:
             self.helper.send_success(key, '执行结束', start_time=timestamp)
         return is_success
@@ -425,6 +446,7 @@ class NodeExecutor:
         timestamp = time.time()
         key = f'{node.id}.{host.id}'
         pid_key = f'{self.token}.{node.id}.{host.id}'
+        pid_stop = None
         self.helper.send_info(key, '开始传输数据\r\n', 'processing')
         try:
             with tempfile.NamedTemporaryFile(mode='w') as fp:
@@ -438,13 +460,13 @@ class NodeExecutor:
                 ssh_command = shlex.quote(f'ssh -p {host.port} -o StrictHostKeyChecking=no -i {fp.name}')
                 command = f'rsync {options} -e {ssh_command} {argument}'
                 with Executor() as et:
-                    self.rds.set(pid_key, f'local.{et.pid}', 3600)
+                    pid_stop = self._save_pid(pid_key, f'local.{et.pid}')
                     is_success = self.helper.local_exec(key, et, command)
         except Exception as e:
             self.helper.send_error(key, f'Exception: {e}')
             return False
         finally:
-            self.rds.delete(pid_key)
+            self._remove_pid(pid_key, pid_stop)
         if is_success:
             self.helper.send_success(key, '传输完成', start_time=timestamp)
         return is_success

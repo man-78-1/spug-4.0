@@ -82,8 +82,11 @@ def result(request, token):
     if not raw:
         return api_response(error='Token not found or expired', status=404)
     raw = {k.decode(): v.decode() for k, v in raw.items()}
+    meta = raw.get('meta')
+    if not meta:
+        return api_response(error='Token not found or expired', status=404)
     hosts, state = [], 'success'
-    for host_id, title in json.loads(raw['meta'])['hosts'].items():
+    for host_id, title in json.loads(meta)['hosts'].items():
         code = raw.get(f'status:{host_id}')
         output = rds.get(f'{_result_key(token)}:{host_id}')
         if code is None:

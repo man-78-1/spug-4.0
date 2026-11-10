@@ -6,7 +6,7 @@ from django.db.models import F
 from libs import JsonParser, Argument, json_response, auth
 from apps.app.models import App, Deploy, DeployExtend1, DeployExtend2
 from apps.config.models import Config, ConfigHistory, Service
-from apps.app.utils import fetch_versions, remove_repo
+from apps.app.utils import fetch_versions, remove_repo, deploy_in_scope
 from apps.setting.utils import AppSetting
 from libs.gitlib import is_valid_git_url
 import json
@@ -202,7 +202,7 @@ class DeployView(View):
 @auth('deploy.app.config|deploy.repository.add|deploy.request.add|deploy.request.edit')
 def get_versions(request, d_id):
     deploy = Deploy.objects.filter(pk=d_id).first()
-    if not deploy:
+    if not deploy or not deploy_in_scope(request.user, deploy):
         return json_response(error='未找到指定应用')
     if deploy.extend == '2':
         return json_response(error='该应用不支持此操作')

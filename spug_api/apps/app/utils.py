@@ -39,3 +39,11 @@ def fetch_repo(deploy_id, git_repo):
 
 def remove_repo(deploy_id):
     shutil.rmtree(os.path.join(settings.REPOS_DIR, str(deploy_id)), True)
+
+
+def deploy_in_scope(user, deploy):
+    """判断用户是否拥有该发布配置所属应用和环境的部署权限，超管始终放行。"""
+    if user.is_supper:
+        return True
+    perms = user.deploy_perms
+    return deploy.app_id in perms['apps'] and deploy.env_id in perms['envs']

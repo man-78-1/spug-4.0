@@ -43,14 +43,6 @@ def check_hosts(host_ids, allowed_host_ids):
     return True
 
 
-def deploy_in_scope(user, deploy):
-    """判断用户是否拥有该发布配置所属应用和环境的部署权限，超管始终放行。"""
-    if user.is_supper:
-        return True
-    perms = user.deploy_perms
-    return deploy.app_id in perms['apps'] and deploy.env_id in perms['envs']
-
-
 def deploy_scope_query(user):
     """按应用/环境权限生成发布申请的过滤条件，超管不限制。"""
     if user.is_supper:

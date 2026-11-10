@@ -9,7 +9,8 @@ from libs import json_response, JsonParser, Argument, human_datetime, auth, Attr
 from apps.deploy.models import DeployRequest
 from apps.app.models import Deploy, DeployExtend2
 from apps.repository.models import Repository
-from apps.deploy.utils import dispatch, Helper, sync_interrupted, check_hosts, deploy_in_scope, deploy_scope_query
+from apps.deploy.utils import dispatch, Helper, sync_interrupted, check_hosts, deploy_scope_query
+from apps.app.utils import deploy_in_scope
 from libs.locale import get_request_language
 from apps.host.models import Host
 from collections import defaultdict

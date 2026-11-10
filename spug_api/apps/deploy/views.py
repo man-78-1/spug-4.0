@@ -9,7 +9,7 @@ from libs import json_response, JsonParser, Argument, human_datetime, auth, Attr
 from apps.deploy.models import DeployRequest
 from apps.app.models import Deploy, DeployExtend2
 from apps.repository.models import Repository
-from apps.deploy.utils import dispatch, Helper, sync_interrupted, check_hosts
+from apps.deploy.utils import dispatch, Helper, sync_interrupted, check_hosts, deploy_in_scope, deploy_scope_query
 from libs.locale import get_request_language
 from apps.host.models import Host
 from collections import defaultdict
@@ -24,10 +24,7 @@ class RequestView(View):
     @auth('deploy.request.view')
     def get(self, request):
         data, query, counter = [], {}, {}
-        if not request.user.is_supper:
-            perms = request.user.deploy_perms
-            query['deploy__app_id__in'] = perms['apps']
-            query['deploy__env_id__in'] = perms['envs']
+        query.update(deploy_scope_query(request.user))
         requests = list(DeployRequest.objects.filter(**query).annotate(
                 env_id=F('deploy__env_id'),
                 env_name=F('deploy__env__name'),
@@ -70,9 +67,12 @@ class RequestView(View):
             Argument('value', required=False),
         ).parse(request.GET)
         if error is None:
+            query = deploy_scope_query(request.user)
             if form.id:
-                deploy = DeployRequest.objects.get(pk=form.id)
-                deploy.delete()
+                req = DeployRequest.objects.filter(pk=form.id, **query).first()
+                if not req:
+                    return json_response(error='未找到指定发布申请')
+                req.delete()
                 return json_response()
 
             count = 0
@@ -80,18 +80,19 @@ class RequestView(View):
                 if not str(form.value).isdigit() or int(form.value) < 1:
                     return json_response(error='请输入正确的保留数量')
                 counter, form.value = defaultdict(int), int(form.value)
-                for item in DeployRequest.objects.all():
+                for item in DeployRequest.objects.filter(**query):
                     counter[item.deploy_id] += 1
                     if counter[item.deploy_id] > form.value:
                         count += 1
                         item.delete()
             elif form.mode == 'expire':
-                for item in DeployRequest.objects.filter(created_at__lt=form.value):
+                for item in DeployRequest.objects.filter(created_at__lt=form.value, **query):
                     count += 1
                     item.delete()
             elif form.mode == 'deploy':
                 app_id, env_id = str(form.value).split(',')
-                for item in DeployRequest.objects.filter(deploy__app_id=app_id, deploy__env_id=env_id):
+                for item in DeployRequest.objects.filter(
+                        deploy__app_id=app_id, deploy__env_id=env_id, **query):
                     count += 1
                     item.delete()
             return json_response(count)
@@ -101,7 +102,7 @@ class RequestView(View):
 class RequestDetailView(View):
     @auth('deploy.request.view')
     def get(self, request, r_id):
-        req = DeployRequest.objects.filter(pk=r_id).first()
+        req = DeployRequest.objects.filter(pk=r_id, **deploy_scope_query(request.user)).first()
         if not req:
             return json_response(error='未找到指定发布申请')
         sync_interrupted([req])
@@ -132,10 +133,7 @@ class RequestDetailView(View):
         ).parse(request.body)
         if error is None:
             query, is_fail_mode = {'pk': r_id}, form.mode == 'fail'
-            if not request.user.is_supper:
-                perms = request.user.deploy_perms
-                query['deploy__app_id__in'] = perms['apps']
-                query['deploy__env_id__in'] = perms['envs']
+            query.update(deploy_scope_query(request.user))
             req = DeployRequest.objects.filter(**query).first()
             if not req:
                 return json_response(error='未找到指定发布申请')
@@ -208,7 +206,7 @@ class RequestDetailView(View):
             Argument('is_pass', type=bool, help='参数错误')
         ).parse(request.body)
         if error is None:
-            req = DeployRequest.objects.filter(pk=r_id).first()
+            req = DeployRequest.objects.filter(pk=r_id, **deploy_scope_query(request.user)).first()
             if not req:
                 return json_response(error='未找到指定申请')
             if not form.is_pass and not form.reason:
@@ -237,7 +235,9 @@ def post_request_ext1(request):
         Argument('desc', required=False),
     ).parse(request.body)
     if error is None:
-        deploy = Deploy.objects.get(pk=form.deploy_id)
+        deploy = Deploy.objects.filter(pk=form.deploy_id).first()
+        if not deploy or not deploy_in_scope(request.user, deploy):
+            return json_response(error='未找到该发布配置')
         if not check_hosts(form.host_ids, json.loads(deploy.host_ids)):
             return json_response(error='所选主机不在发布配置的主机范围内')
         form.spug_version = Repository.make_spug_version(deploy.id)
@@ -266,7 +266,9 @@ def post_request_ext1(request):
         form.status = '0' if deploy.is_audit else '1'
         form.host_ids = json.dumps(sorted(form.host_ids))
         if form.id:
-            req = DeployRequest.objects.get(pk=form.id)
+            req = DeployRequest.objects.filter(pk=form.id, **deploy_scope_query(request.user)).first()
+            if not req:
+                return json_response(error='未找到指定发布申请')
             is_required_notify = deploy.is_audit and req.status == '-1'
             DeployRequest.objects.filter(pk=form.id).update(created_by=request.user, reason=None, **form)
         else:
@@ -286,7 +288,10 @@ def post_request_ext1_rollback(request):
         Argument('desc', required=False),
     ).parse(request.body)
     if error is None:
-        req = DeployRequest.objects.get(pk=form.pop('request_id'))
+        req = DeployRequest.objects.filter(
+            pk=form.pop('request_id'), **deploy_scope_query(request.user)).first()
+        if not req:
+            return json_response(error='未找到指定发布申请')
         # 回滚沿用原申请的主机范围，前端也是这么限制的，这里补齐服务端校验
         if not check_hosts(form.host_ids, json.loads(req.host_ids)):
             return json_response(error='所选主机不在原发布申请的主机范围内')
@@ -328,7 +333,7 @@ def post_request_ext2(request):
     ).parse(request.body)
     if error is None:
         deploy = Deploy.objects.filter(pk=form.deploy_id).first()
-        if not deploy:
+        if not deploy or not deploy_in_scope(request.user, deploy):
             return json_response(error='未找到该发布配置')
         if not check_hosts(form.host_ids, json.loads(deploy.host_ids)):
             return json_response(error='所选主机不在发布配置的主机范围内')
@@ -344,7 +349,9 @@ def post_request_ext2(request):
         form.status = '0' if deploy.is_audit else '1'
         form.host_ids = json.dumps(form.host_ids)
         if form.id:
-            req = DeployRequest.objects.get(pk=form.id)
+            req = DeployRequest.objects.filter(pk=form.id, **deploy_scope_query(request.user)).first()
+            if not req:
+                return json_response(error='未找到指定发布申请')
             is_required_notify = deploy.is_audit and req.status == '-1'
             form.update(created_by=request.user, reason=None)
             req.update_by_dict(form)
@@ -362,7 +369,9 @@ def get_request_info(request):
         Argument('id', type=int, help='参数错误')
     ).parse(request.GET)
     if error is None:
-        req = DeployRequest.objects.get(pk=form.id)
+        req = DeployRequest.objects.filter(pk=form.id, **deploy_scope_query(request.user)).first()
+        if not req:
+            return json_response(error='未找到指定发布申请')
         sync_interrupted([req])
         response = req.to_dict(selects=('status', 'reason'))
         response['deploy_status'] = json.loads(req.deploy_status)
@@ -381,7 +390,8 @@ def do_upload(request):
     if not (deploy_id or '').isdecimal():
         return json_response(error='参数错误')
     deploy_id = int(deploy_id)
-    if not Deploy.objects.filter(pk=deploy_id).exists():
+    deploy = Deploy.objects.filter(pk=deploy_id).first()
+    if not deploy or not deploy_in_scope(request.user, deploy):
         return json_response(error='未找到该发布配置')
 
     dir_name = os.path.join(settings.REPOS_DIR, str(deploy_id))

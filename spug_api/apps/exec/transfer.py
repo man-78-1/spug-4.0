@@ -81,7 +81,9 @@ class TransferView(View):
                     file = request.FILES.get(f'file{index}')
                     if not file:
                         break
-                    with open(os.path.join(base_dir, file.name), 'wb') as f:
+                    # 上传文件名来自客户端，可含 ../或绝对路径；只取 basename，
+                    # 否则 os.path.join 会带着它逃出 token 目录写到服务端任意位置
+                    with open(os.path.join(base_dir, os.path.basename(file.name)), 'wb') as f:
                         for chunk in file.chunks():
                             f.write(chunk)
                     index += 1

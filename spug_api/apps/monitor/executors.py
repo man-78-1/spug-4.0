@@ -123,7 +123,7 @@ def monitor_worker_handler(job):
             is_ok, message = False, f'unknown host id for {addr!r}'
         else:
             is_ok, message = host_executor(host, command)
-        target = f'{host.name}({host.hostname})'
+            target = f'{host.name}({host.hostname})'
 
     rds, key, f_count, f_time = get_redis_connection(), f'spug:det:{task_id}', f'c_{addr}', f't_{addr}'
     v_count, v_time = rds.hmget(key, f_count, f_time)
@@ -157,4 +157,6 @@ def dispatch(tp, addr, extra):
     else:
         raise TypeError(f'invalid monitor type: {tp!r}')
     host = Host.objects.filter(pk=addr).first()
+    if not host:
+        return False, f'unknown host id for {addr!r}'
     return host_executor(host, command)

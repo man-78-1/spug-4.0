@@ -46,9 +46,9 @@ class DetectionView(View):
             Argument('type', filter=lambda x: x in dict(Detection.TYPES), help='请选择监控类型'),
             Argument('extra', required=False),
             Argument('desc', required=False),
-            Argument('rate', type=int, default=5),
-            Argument('threshold', type=int, default=3),
-            Argument('quiet', type=int, default=24 * 60),
+            Argument('rate', type=int, default=5, filter=lambda x: x > 0, help='监控频率必须为正整数（分钟）'),
+            Argument('threshold', type=int, default=3, filter=lambda x: x > 0, help='报警阈值必须为正整数（次）'),
+            Argument('quiet', type=int, default=24 * 60, filter=lambda x: x > 0, help='通道沉默必须为正整数（分钟）'),
             Argument('notify_grp', type=list, help='请选择报警联系组'),
             Argument('notify_mode', type=list, help='请选择报警方式'),
         ).parse(request.body)
